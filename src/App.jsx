@@ -1,4 +1,3 @@
-
 import { useState } from 'react'
 
 const initialProducts = [
@@ -55,44 +54,35 @@ const emptyForm = {
 }
 
 function App() {
-  
   const [products, setProducts] = useState(initialProducts)
-  const [cart, setCart] = useState({})
+  const [cart, setCart] = useState([])
   const [category, setCategory] = useState('All')
   const [search, setSearch] = useState('')
   const [page, setPage] = useState('products')
   const [selectedProduct, setSelectedProduct] = useState(null)
   const [form, setForm] = useState(emptyForm)
   const [error, setError] = useState('')
-  
+  const [slide, setSlide] = useState(0)
+  const [detailQuantity, setDetailQuantity] = useState(1)
 
   const categories = [
     'All',
     ...new Set(products.map((product) => product.category)),
   ]
 
-  
-const filteredProducts = products.filter((product) => {
-  const matchesCategory =
-    category === 'All' || product.category === category
+  const filteredProducts = products.filter((product) => {
+    const matchesCategory =
+      category === 'All' || product.category === category
+    const matchesSearch =
+      product.name.toLowerCase().includes(search.toLowerCase()) ||
+      product.category.toLowerCase().includes(search.toLowerCase())
+    return matchesCategory && matchesSearch
+  })
 
-  const matchesSearch =
-    product.name.toLowerCase().includes(search.toLowerCase()) ||
-    product.category.toLowerCase().includes(search.toLowerCase())
+  const totalItems = cart.reduce((sum, item) => sum + item.cartQuantity, 0)
 
-  return matchesCategory && matchesSearch
-})
-
-  
-
-  const totalItems = Object.values(cart).reduce(
-    (sum, quantity) => sum + quantity,
-    0
-  )
-
-  const cartTotal = products.reduce(
-    (sum, product) =>
-      sum + product.price * (cart[product.id] || 0),
+  const cartTotal = cart.reduce(
+    (sum, item) => sum + item.price * item.cartQuantity,
     0
   )
 
@@ -101,49 +91,75 @@ const filteredProducts = products.filter((product) => {
     0
   )
 
-
-
+  // Update stock quantity helper
   function changeStock(id, amount) {
     setProducts((current) =>
       current.map((product) =>
         product.id === id
-          ? {
-              ...product,
-              quantity: Math.max(0, product.quantity + amount),
-            }
+          ? { ...product, quantity: Math.max(0, product.quantity + amount) }
           : product
       )
     )
   }
 
-  function addToCart(product) {
-    if (product.quantity < 1) return
+  const addToCart = (product, quantity = 1) => {
+    if (quantity < 1 || quantity > product.quantity) {
+      alert('Invalid quantity or insufficient stock.')
+      return
+    }
 
-    setCart((current) => {
-      const inCart = current[product.id] || 0
+    // Deduct from stock immediately
+    changeStock(product.id, -quantity)
 
-      if (inCart >= product.quantity) return current
+    setCart((currentCart) => {
+      const existingItem = currentCart.find(
+        (item) => item.id === product.id
+      )
 
-      return {
-        ...current,
-        [product.id]: inCart + 1,
+      if (existingItem) {
+        return currentCart.map((item) =>
+          item.id === product.id
+            ? { ...item, cartQuantity: item.cartQuantity + quantity }
+            : item
+        )
       }
+
+      return [
+        ...currentCart,
+        {
+          ...product,
+          cartQuantity: quantity,
+        },
+      ]
     })
+
+    alert('Product added to cart!')
   }
 
   function changeCartQuantity(product, amount) {
     setCart((current) => {
-      const next = (current[product.id] || 0) + amount
+      const existing = current.find((item) => item.id === product.id)
+      if (!existing) return current
 
-      if (next <= 0) {
-        const updated = { ...current }
-        delete updated[product.id]
-        return updated
+      const nextQty = existing.cartQuantity + amount
+
+      if (nextQty <= 0) {
+        // Return stock when removed from cart
+        changeStock(product.id, existing.cartQuantity)
+        return current.filter((item) => item.id !== product.id)
       }
 
-      if (next > product.quantity) return current
+      if (amount > 0 && nextQty > product.quantity) {
+        alert('Not enough stock available.')
+        return current
+      }
 
-      return { ...current, [product.id]: next }
+      // Update stock when quantity changes
+      changeStock(product.id, -amount)
+
+      return current.map((item) =>
+        item.id === product.id ? { ...item, cartQuantity: nextQty } : item
+      )
     })
   }
 
@@ -155,11 +171,7 @@ const filteredProducts = products.filter((product) => {
   function addProduct(event) {
     event.preventDefault()
 
-    if (
-      Object.values(form).some(
-        (value) => String(value).trim() === ''
-      )
-    ) {
+    if (Object.values(form).some((value) => String(value).trim() === '')) {
       setError('Please fill in all fields.')
       return
     }
@@ -205,6 +217,7 @@ const filteredProducts = products.filter((product) => {
 
   function openDetails(product) {
     setSelectedProduct(product)
+    setDetailQuantity(1)
     setPage('details')
   }
 
@@ -213,10 +226,27 @@ const filteredProducts = products.filter((product) => {
     setSelectedProduct(null)
   }
 
-  function stockLabel(quantity) {
-    if (quantity === 0) return 'Out of Stock'
-    if (quantity < 5) return 'Low Stock'
-    return 'In Stock'
+  // Stock status helper with styling logic
+  function StockBadge({ quantity }) {
+    if (quantity === 0) {
+      return (
+        <span className="inline-block rounded-md bg-gray-100 px-3 py-1 text-sm font-bold text-gray-700">
+          Out of Stock
+        </span>
+      )
+    }
+    if (quantity < 5) {
+      return (
+        <span className="inline-block rounded-md bg-red-100 px-3 py-1 text-sm font-bold text-red-700">
+          Low Stock
+        </span>
+      )
+    }
+    return (
+      <span className="inline-block rounded-md bg-green-100 px-3 py-1 text-sm font-bold text-green-700">
+        In Stock
+      </span>
+    )
   }
 
   return (
@@ -232,19 +262,28 @@ const filteredProducts = products.filter((product) => {
             </p>
           </button>
 
-          <nav className="flex flex-wrap gap-2">
+          <nav className="flex flex-wrap items-center gap-2">
             <button
               onClick={goToProducts}
-              className="rounded-lg px-4 py-2 font-semibold hover:bg-pink-50"
+              className="rounded-lg px-3 py-2 font-semibold hover:bg-green-50"
             >
-              Products
+              Home
             </button>
+
             <button
-              onClick={() => setPage('add')}
-              className="rounded-lg px-4 py-2 font-semibold hover:bg-pi-50"
+              onClick={() => {
+                goToProducts()
+                setTimeout(() => {
+                  document
+                    .getElementById('featured-products')
+                    ?.scrollIntoView({ behavior: 'smooth' })
+                }, 0)
+              }}
+              className="rounded-lg px-3 py-2 font-semibold hover:bg-pink-50"
             >
-              + Add Product
+              Featured
             </button>
+
             <button
               onClick={() => setPage('cart')}
               className="rounded-lg bg-pink-700 px-4 py-2 font-semibold text-white hover:bg-pink-800"
@@ -258,67 +297,175 @@ const filteredProducts = products.filter((product) => {
       <main className="max-w-7xl mx-auto px-5 py-8">
         {page === 'products' && (
           <>
-       
+            <section className="relative mb-10 overflow-hidden rounded-2xl bg-slate-900">
+              <div className="grid min-h-64 items-center md:grid-cols-2">
+                <div className="z-10 p-7 text-white md:p-10">
+                  <p className="font-semibold uppercase tracking-widest text-pink-300">
+                    Welcome to ProductHub
+                  </p>
+                  <h2 className="mt-3 text-3xl font-extrabold md:text-5xl">
+                    {[
+                      'Find Your Perfect Product',
+                      'Discover Our Featured Items',
+                      'Quality Products, Great Prices',
+                    ][slide]}
+                  </h2>
+                  <p className="mt-4 text-slate-300">
+                    Explore our products, discover new favorites, and shop
+                    your essentials in one place.
+                  </p>
+                  <button
+                    onClick={() => {
+                      document
+                        .getElementById('product-list')
+                        ?.scrollIntoView({ behavior: 'smooth' })
+                    }}
+                    className="mt-6 rounded-lg bg-pink-600 px-6 py-3 font-bold text-white hover:bg-pink-700"
+                  >
+                    Shop Now →
+                  </button>
+                </div>
+
+                <div className="relative h-56 md:h-full">
+                  <img
+                    src={[
+                      'https://images.unsplash.com/photo-1498049794561-7780e7231661?w=1000',
+                      'https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=1000',
+                      'https://images.unsplash.com/photo-1527864550417-7fd91fc51a46?w=1000',
+                    ][slide]}
+                    alt="Featured products"
+                    className="h-full w-full object-cover"
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-r from-slate-900/50 to-transparent" />
+                </div>
+              </div>
+
+              <div className="absolute bottom-4 left-7 flex gap-2 md:left-10">
+                {[0, 1, 2].map((index) => (
+                  <button
+                    key={index}
+                    onClick={() => setSlide(index)}
+                    aria-label={`Show slide ${index + 1}`}
+                    className={`h-2.5 rounded-full transition-all ${
+                      slide === index ? 'w-8 bg-white' : 'w-3 bg-white/50'
+                    }`}
+                  />
+                ))}
+              </div>
+            </section>
+
+            <section className="mb-12">
+              <div className="mb-5 flex items-end justify-between gap-3">
+                <div>
+                  <p className="text-sm font-bold uppercase tracking-wider text-pink-700">
+                    Handpicked for you
+                  </p>
+                  <h2 className="mt-1 text-2xl font-extrabold">
+                    Featured Products
+                  </h2>
+                  <p className="mt-1 text-sm text-slate-500">
+                    Click any product to explore its details.
+                  </p>
+                </div>
+                <button
+                  onClick={() => {
+                    document
+                      .getElementById('product-list')
+                      ?.scrollIntoView({ behavior: 'smooth' })
+                  }}
+                  className="text-sm font-bold text-pink-700 hover:underline"
+                >
+                  View All →
+                </button>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-5">
+                {products.slice(0, 5).map((product) => (
+                  <button
+                    key={product.id}
+                    onClick={() => openDetails(product)}
+                    className="overflow-hidden rounded-xl border border-slate-200 bg-white text-left shadow-sm transition hover:-translate-y-1 hover:shadow-lg"
+                  >
+                    <img
+                      src={product.image}
+                      alt={product.name}
+                      className="h-28 w-full object-cover sm:h-36"
+                    />
+                    <div className="p-3">
+                      <p className="truncate text-sm font-bold">
+                        {product.name}
+                      </p>
+                      <p className="mt-1 text-xs text-slate-500">
+                        {product.category}
+                      </p>
+                      <p className="mt-2 font-extrabold text-pink-700">
+                        {money(product.price)}
+                      </p>
+                      <div className="mt-2">
+                        <StockBadge quantity={product.quantity} />
+                      </div>
+                      <p className="mt-2 text-xs font-semibold text-slate-500">
+                        View Product →
+                      </p>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            </section>
 
             <section className="mb-6 grid gap-4 sm:grid-cols-3">
               <div className="rounded-xl bg-white p-5 shadow-sm">
                 <p className="text-sm text-slate-500">Total Products</p>
-                <p className="mt-2 text-3xl font-bold">
-                  {products.length}
-                </p>
+                <p className="mt-2 text-3xl font-bold">{products.length}</p>
               </div>
               <div className="rounded-xl bg-white p-5 shadow-sm">
                 <p className="text-sm text-slate-500">Cart Items</p>
                 <p className="mt-2 text-3xl font-bold">{totalItems}</p>
               </div>
               <div className="rounded-xl bg-white p-5 shadow-sm">
-                <p className="text-sm text-slate-500">
-                  Inventory Value
-                </p>
+                <p className="text-sm text-slate-500">Inventory Value</p>
                 <p className="mt-2 text-2xl font-bold text-pink-700">
                   {money(productTotal)}
                 </p>
               </div>
             </section>
 
-            
-<div className="mb-6 flex flex-col gap-4">
-  <div>
-    <h2 className="text-2xl font-bold">Our Products</h2>
-    <p className="mt-1 text-slate-500">
-      Search and select a product to see its full details.
-    </p>
-  </div>
+            <div className="mb-6 flex flex-col gap-4">
+              <div>
+                <h2 className="text-2xl font-bold">Our Products</h2>
+                <p className="mt-1 text-slate-500">
+                  Search and select a product to see its full details.
+                </p>
+              </div>
 
-  <div className="flex flex-col gap-3 sm:flex-row">
-    <div className="relative flex-1">
-      <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400">
-        🔍
-      </span>
+              <div id="product-list" className="mb-6 flex flex-col gap-4"></div>
 
-      <input
-        type="text"
-        value={search}
-        onChange={(event) => setSearch(event.target.value)}
-        placeholder="Search product name or category..."
-        className="w-full rounded-xl border border-slate-300 bg-white py-3 pl-11 pr-4 outline-none transition focus:border-pink-600 focus:ring-2 focus:ring-pink-100"
-      />
-    </div>
-
-    <select
-      value={category}
-      onChange={(event) => setCategory(event.target.value)}
-      className="rounded-xl border border-slate-300 bg-white px-4 py-3 outline-none focus:border-pink-600"
-    >
-      {categories.map((item) => (
-        <option key={item} value={item}>
-          {item === 'All' ? 'All Categories' : item}
-        </option>
-      ))}
-    </select>
-  </div>
-</div>
-
+              <div className="flex flex-col gap-3 sm:flex-row">
+                <div className="relative flex-1">
+                  <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400">
+                    🔍
+                  </span>
+                  <input
+                    type="text"
+                    value={search}
+                    onChange={(event) => setSearch(event.target.value)}
+                    placeholder="Search product name or category..."
+                    className="w-full rounded-xl border border-slate-300 bg-white py-3 pl-11 pr-4 outline-none transition focus:border-pink-600 focus:ring-2 focus:ring-pink-100"
+                  />
+                </div>
+                <select
+                  value={category}
+                  onChange={(event) => setCategory(event.target.value)}
+                  className="rounded-xl border border-slate-300 bg-white px-4 py-3 outline-none focus:border-pink-600"
+                >
+                  {categories.map((item) => (
+                    <option key={item} value={item}>
+                      {item === 'All' ? 'All Categories' : item}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
 
             <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
               {filteredProducts.map((product) => (
@@ -358,49 +505,8 @@ const filteredProducts = products.filter((product) => {
                       {money(product.price)}
                     </p>
 
-                    <div className="mt-4 flex items-center justify-between gap-2">
-                      <div>
-                        <p className="text-sm text-slate-500">
-                          Stock Quantity
-                        </p>
-                        <div className="mt-1 flex items-center gap-2">
-                          <button
-                            onClick={() => changeStock(product.id, -1)}
-                            disabled={product.quantity === 0}
-                            className="h-8 w-8 rounded-lg border disabled:opacity-30"
-                            aria-label={`Remove one ${product.name} from stock`}
-                          >
-                            −
-                          </button>
-                          <span className="min-w-5 text-center font-bold">
-                            {product.quantity}
-                          </span>
-                          <button
-                            onClick={() => changeStock(product.id, 1)}
-                            className="h-8 w-8 rounded-lg border"
-                            aria-label={`Add one ${product.name} to stock`}
-                          >
-                            +
-                          </button>
-                        </div>
-                      </div>
-
-                      <span
-                        className={`rounded-full px-2 py-1 text-xs font-semibold ${
-                          product.quantity < 5
-                            ? 'bg-red-100 text-red-700'
-                            : 'bg-pink-100 text-pink-700'
-                        }`}
-                      >
-                        {stockLabel(product.quantity)}
-                      </span>
-                    </div>
-
-                    <div className="mt-4 rounded-lg bg-slate-50 p-3">
-                      <p className="text-sm text-slate-500">Subtotal</p>
-                      <p className="font-bold">
-                        {money(product.price * product.quantity)}
-                      </p>
+                    <div className="mt-3">
+                      <StockBadge quantity={product.quantity} />
                     </div>
 
                     <div className="mt-4 grid grid-cols-2 gap-2">
@@ -412,17 +518,12 @@ const filteredProducts = products.filter((product) => {
                       </button>
                       <button
                         onClick={() => addToCart(product)}
-                        disabled={
-                          product.quantity === 0 ||
-                          (cart[product.id] || 0) >= product.quantity
-                        }
+                        disabled={product.quantity === 0}
                         className="rounded-lg bg-pink-700 px-3 py-3 text-sm font-semibold text-white hover:bg-pink-800 disabled:cursor-not-allowed disabled:bg-slate-300"
                       >
                         {product.quantity === 0
                           ? 'Out of Stock'
-                          : (cart[product.id] || 0) >= product.quantity
-                            ? 'Stock Limit'
-                            : 'Add to Cart'}
+                          : 'Add to Cart'}
                       </button>
                     </div>
                   </div>
@@ -430,21 +531,24 @@ const filteredProducts = products.filter((product) => {
               ))}
             </div>
 
+            <div className="mt-8 flex justify-end">
+              <button
+                onClick={() => {
+                  setForm(emptyForm)
+                  setError('')
+                  setPage('add')
+                }}
+                className="rounded-lg bg-pink-700 px-6 py-3 font-semibold text-white hover:bg-pink-800"
+              >
+                + Add New Product
+              </button>
+            </div>
+
             {filteredProducts.length === 0 && (
               <p className="rounded-xl bg-white p-8 text-center text-slate-500">
                 No products found in this category.
               </p>
             )}
-
-            <section className="mt-8 rounded-2xl bg-white p-6 shadow-sm">
-              <h3 className="text-lg font-bold">Total Inventory Value</h3>
-              <p className="mt-2 text-sm text-slate-500">
-                Sum of all product prices multiplied by their stock quantities.
-              </p>
-              <p className="mt-3 text-3xl font-extrabold text-pink-700">
-                {money(productTotal)}
-              </p>
-            </section>
           </>
         )}
 
@@ -483,30 +587,49 @@ const filteredProducts = products.filter((product) => {
                   {selectedProduct.description}
                 </p>
 
+                <div className="mt-6">
+                  <p className="mb-2 font-semibold">Quantity</p>
+                  <div className="flex items-center gap-4">
+                    <button
+                      onClick={() =>
+                        setDetailQuantity((q) => Math.max(1, q - 1))
+                      }
+                      disabled={detailQuantity <= 1}
+                      className="rounded-lg border px-4 py-2 disabled:opacity-40"
+                    >
+                      −
+                    </button>
+                    <span className="text-lg font-bold">{detailQuantity}</span>
+                    <button
+                      onClick={() =>
+                        setDetailQuantity((q) =>
+                          Math.min(selectedProduct.quantity, q + 1)
+                        )
+                      }
+                      disabled={detailQuantity >= selectedProduct.quantity}
+                      className="rounded-lg border px-4 py-2 disabled:opacity-40"
+                    >
+                      +
+                    </button>
+                  </div>
+                </div>
+
                 <h3 className="mt-5 font-bold">Specifications</h3>
                 <p className="mt-2 text-slate-600">
                   {selectedProduct.specification}
                 </p>
 
-                <p className="mt-5">
-                  <span className="font-semibold">Available stock: </span>
-                  {selectedProduct.quantity}
-                </p>
-
-                <p className={`mt-2 font-semibold ${
-                  selectedProduct.quantity < 5
-                    ? 'text-red-600'
-                    : 'text-pink-700'
-                }`}>
-                  {stockLabel(selectedProduct.quantity)}
-                </p>
+                <div className="mt-4">
+                  <p className="mb-2 font-semibold">Available Stock:</p>
+                  <p className="text-xl font-bold">{selectedProduct.quantity}</p>
+                  <div className="mt-2">
+                    <StockBadge quantity={selectedProduct.quantity} />
+                  </div>
+                </div>
 
                 <button
-                  onClick={() => addToCart(selectedProduct)}
-                  disabled={
-                    selectedProduct.quantity === 0 ||
-                    (cart[selectedProduct.id] || 0) >= selectedProduct.quantity
-                  }
+                  onClick={() => addToCart(selectedProduct, detailQuantity)}
+                  disabled={selectedProduct.quantity === 0}
                   className="mt-6 w-full rounded-lg bg-pink-700 px-5 py-3 font-bold text-white hover:bg-pink-800 disabled:bg-slate-300"
                 >
                   Add to Cart
@@ -577,22 +700,21 @@ const filteredProducts = products.filter((product) => {
                     onChange={handleFormChange}
                     placeholder={field.placeholder}
                     min={
-                      field.name === 'rating' ||
-                      field.name === 'quantity'
+                      field.name === 'rating' || field.name === 'quantity'
                         ? 0
                         : field.name === 'price'
-                          ? 0.01
-                          : undefined
+                        ? 0.01
+                        : undefined
                     }
                     max={field.name === 'rating' ? 5 : undefined}
                     step={
                       field.name === 'rating'
                         ? 0.1
                         : field.name === 'price'
-                          ? 0.01
-                          : field.name === 'quantity'
-                            ? 1
-                            : undefined
+                        ? 0.01
+                        : field.name === 'quantity'
+                        ? 1
+                        : undefined
                     }
                     className="w-full rounded-lg border border-slate-300 px-4 py-3 outline-none focus:border-pink-600 focus:ring-2 focus:ring-pink-100"
                   />
@@ -600,9 +722,7 @@ const filteredProducts = products.filter((product) => {
               ))}
 
               <label className="block sm:col-span-2">
-                <span className="mb-2 block font-semibold">
-                  Description
-                </span>
+                <span className="mb-2 block font-semibold">Description</span>
                 <textarea
                   required
                   name="description"
@@ -660,6 +780,7 @@ const filteredProducts = products.filter((product) => {
 
         {page === 'cart' && (
           <section>
+            <section id="featured-products" className="mb-12"></section>
             <h2 className="text-3xl font-extrabold">Shopping Cart</h2>
             <p className="mb-6 mt-2 text-slate-500">
               Manage your selected products and quantities.
@@ -667,9 +788,7 @@ const filteredProducts = products.filter((product) => {
 
             {totalItems === 0 ? (
               <div className="rounded-2xl bg-white p-10 text-center shadow-sm">
-                <p className="text-lg text-slate-500">
-                  Your cart is empty.
-                </p>
+                <p className="text-lg text-slate-500">Your cart is empty.</p>
                 <button
                   onClick={goToProducts}
                   className="mt-5 rounded-lg bg-pink-700 px-5 py-3 font-semibold text-white"
@@ -679,53 +798,49 @@ const filteredProducts = products.filter((product) => {
               </div>
             ) : (
               <div className="space-y-4">
-                {products
-                  .filter((product) => cart[product.id] > 0)
-                  .map((product) => (
-                    <article
-                      key={product.id}
-                      className="flex flex-wrap items-center gap-4 rounded-xl bg-white p-4 shadow-sm"
-                    >
-                      <img
-                        src={product.image}
-                        alt={product.name}
-                        className="h-24 w-24 rounded-lg object-cover"
-                      />
-
-                      <div className="min-w-32 flex-1">
-                        <h3 className="font-bold">{product.name}</h3>
-                        <p className="mt-1 text-slate-500">
-                          {money(product.price)} each
-                        </p>
-                        <p className="mt-2 font-bold text-pink-700">
-                          Subtotal: {money(
-                            product.price * cart[product.id]
-                          )}
-                        </p>
+                {cart.map((item) => (
+                  <article
+                    key={item.id}
+                    className="flex flex-wrap items-center gap-4 rounded-xl bg-white p-4 shadow-sm"
+                  >
+                    <img
+                      src={item.image}
+                      alt={item.name}
+                      className="h-24 w-24 rounded-lg object-cover"
+                    />
+                    <div className="min-w-32 flex-1">
+                      <h3 className="font-bold">{item.name}</h3>
+                      <p className="mt-1 text-slate-500">
+                        {money(item.price)} each
+                      </p>
+                      <div className="mt-2">
+                        <StockBadge quantity={item.quantity} />
                       </div>
+                      <p className="mt-2 font-bold text-pink-700">
+                        Subtotal: {money(item.price * item.cartQuantity)}
+                      </p>
+                    </div>
 
-                      <div className="flex items-center gap-3">
-                        <button
-                          onClick={() => changeCartQuantity(product, -1)}
-                          className="h-9 w-9 rounded-lg border"
-                          aria-label={`Remove one ${product.name} from cart`}
-                        >
-                          −
-                        </button>
-                        <span className="font-bold">
-                          {cart[product.id]}
-                        </span>
-                        <button
-                          onClick={() => changeCartQuantity(product, 1)}
-                          disabled={cart[product.id] >= product.quantity}
-                          className="h-9 w-9 rounded-lg border disabled:opacity-30"
-                          aria-label={`Add one ${product.name} to cart`}
-                        >
-                          +
-                        </button>
-                      </div>
-                    </article>
-                  ))}
+                    <div className="flex items-center gap-3">
+                      <button
+                        onClick={() => changeCartQuantity(item, -1)}
+                        className="h-9 w-9 rounded-lg border"
+                        aria-label={`Remove one ${item.name} from cart`}
+                      >
+                        −
+                      </button>
+                      <span className="font-bold">{item.cartQuantity}</span>
+                      <button
+                        onClick={() => changeCartQuantity(item, 1)}
+                        disabled={item.cartQuantity >= item.quantity}
+                        className="h-9 w-9 rounded-lg border disabled:opacity-30"
+                        aria-label={`Add one ${item.name} to cart`}
+                      >
+                        +
+                      </button>
+                    </div>
+                  </article>
+                ))}
 
                 <div className="rounded-2xl bg-white p-6 shadow-sm">
                   <p className="text-slate-500">Overall Cart Total</p>
@@ -733,7 +848,7 @@ const filteredProducts = products.filter((product) => {
                     {money(cartTotal)}
                   </p>
                   <button
-                    onClick={() => setCart({})}
+                    onClick={() => setCart([])}
                     className="mt-5 rounded-lg border border-red-200 px-5 py-3 font-semibold text-red-600 hover:bg-red-50"
                   >
                     Clear Cart
