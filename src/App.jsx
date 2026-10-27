@@ -10,7 +10,7 @@ const initialProducts = [
     rating: 4.8,
     price: 450,
     quantity: 12,
-    image: 'https://images.unsplash.com/photo-1527864550417-7fd91fc51a46?w=600',
+    image: 'https://down-sg.img.susercontent.com/file/sg-11134201-22120-zcka6jbgbykvd5',
   },
   {
     id: 2,
@@ -21,7 +21,7 @@ const initialProducts = [
     rating: 4.7,
     price: 1850,
     quantity: 3,
-    image: 'https://images.unsplash.com/photo-1587829741301-dc798b83add3?w=600',
+    image: 'https://www.bing.com/th/id/OIP.vf5_20oBvth2zYmnrKYc2wHaHa?w=127&h=128&c=8&rs=1&qlt=90&o=6&dpr=1.3&pid=ImgAns&rm=2',
   },
   {
     id: 3,
@@ -32,8 +32,38 @@ const initialProducts = [
     rating: 4.5,
     price: 950,
     quantity: 8,
-    image: 'https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=600',
+    image: 'https://www.bing.com/th/id/OIP.71taxvfajyAeJFNAhlFTowHaHa?w=125&h=128&c=8&rs=1&qlt=90&o=6&dpr=1.3&pid=ImgAns&rm=2',
   },
+  {
+    id: 4,
+    name: 'Earphones',
+    category: 'Broad Audio Equipment',
+    description: 'Wireless earphones let you enjoy music without any cables, using Bluetooth technology to connect to your phone or device . Lightweight and portable, they’re great for everyday listening, workouts, and travel. ',
+    rating: 5.0,
+    price: 799,
+    quantity: 30,
+    image: 'https://th.bing.com/th/id/OIP.fWf3-EBOyPS4USEPQSx1pwHaHa?w=186&h=186&c=7&r=0&o=7&dpr=1.3&pid=1.7&rm=3',
+    
+  },
+  {
+    id: 5,
+    name: 'Speaker',
+    category: 'Output Device',
+    description: 'the Aurora SoundWave™ isn’t just a speaker—it’s your personal concert on demand. Engineered with precision-tuned drivers and a bass-enhancing passive radiator, it delivers rich, immersive sound that makes every beat come alive. ',
+    rating: 4.0,
+    price: 2699,
+    quantity: 3,
+    image: 'https://www.bing.com/th/id/OIP.v7o3qFnq4zcl0sNh7IkqEQHaE7?w=193&h=135&c=8&rs=1&qlt=90&o=6&dpr=1.3&pid=ImgAns&rm=2',
+  },
+  {
+  id: 5,
+    name: 'Iphone 16',
+    category: 'Gadget',
+    description: 'The iPhone 16 is part of Apple’s 2024 lineup and is designed as a balanced, mainstream model with upgraded performance, modern connectivity, and improved photography features. Apple lists it as 5G capable, requiring activation with a compatible network provider',
+    price: 70868,
+    quantity: 3,
+    image:'https://th.bing.com/th?q=iPhone+16+Light+Pink&w=120&h=120&c=1&rs=1&qlt=70&r=0&o=7&cb=1&dpr=1.3&pid=InlineBlock&rm=3&mkt=en-PH&cc=PH&setlang=en&adlt=moderate&t=1&mw=247',
+   },
 ]
 
 const money = (amount) =>
@@ -329,9 +359,13 @@ function App() {
                 <div className="relative h-56 md:h-full">
                   <img
                     src={[
-                      'https://images.unsplash.com/photo-1498049794561-7780e7231661?w=1000',
-                      'https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=1000',
-                      'https://images.unsplash.com/photo-1527864550417-7fd91fc51a46?w=1000',
+                      'https://th.bing.com/th/id/OIP.R_XvdykgRRCthOJpnteNJgHaEJ?w=279&h=180&c=7&r=0&o=7&dpr=1.3&pid=1.7&rm=3',
+                      'https://www.bing.com/th/id/OIP.J52lcq99WFV5aIL0bGzWmQHaHa?w=132&h=128&c=8&rs=1&qlt=90&o=6&dpr=1.3&pid=ImgAns&rm=2',
+                      'https://www.bing.com/th/id/OIP.vf5_20oBvth2zYmnrKYc2wHaHa?w=127&h=128&c=8&rs=1&qlt=90&o=6&dpr=1.3&pid=ImgAns&rm=2',
+                      'https://www.bing.com/th/id/OIP.71taxvfajyAeJFNAhlFTowHaHa?w=125&h=128&c=8&rs=1&qlt=90&o=6&dpr=1.3&pid=ImgAns&rm=2',
+                      'https://th.bing.com/th/id/OIP.fWf3-EBOyPS4USEPQSx1pwHaHa?w=186&h=186&c=7&r=0&o=7&dpr=1.3&pid=1.7&rm=3',
+                      'https://www.bing.com/th/id/OIP.v7o3qFnq4zcl0sNh7IkqEQHaE7?w=193&h=135&c=8&rs=1&qlt=90&o=6&dpr=1.3&pid=ImgAns&rm=2',
+                      'https://th.bing.com/th?q=iPhone+16+Light+Pink&w=120&h=120&c=1&rs=1&qlt=70&r=0&o=7&cb=1&dpr=1.3&pid=InlineBlock&rm=3&mkt=en-PH&cc=PH&setlang=en&adlt=moderate&t=1&mw=247',
                     ][slide]}
                     alt="Featured products"
                     className="h-full w-full object-cover"
